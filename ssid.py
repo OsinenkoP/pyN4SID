@@ -1,14 +1,15 @@
 import numpy as np
 import scipy.linalg as la
 
-try:
-    import cvxpy as cvx
-    hasCvx = True
+import cvxpy as cvx
 
-except ImportError:
-    hasCvx = False
+# try:
+#     import cvxpy as cvx
+#     hasCvx = True
+
+# except ImportError:
+#     hasCvx = False
     
-
 
 def generalizedPlant(A,B,C,D,Cov,dt):
     CovChol = la.cholesky(Cov,lower=True)
@@ -39,8 +40,8 @@ def blockTranspose(M,blockHeight,blockWidth):
     Switches block indices without transposing the blocks
     """
     r,c = M.shape
-    Nr = r / blockHeight
-    Nc = c / blockWidth
+    Nr = int(r / blockHeight)
+    Nc = int(c / blockWidth)
     Mblock = np.zeros((Nr,Nc,blockHeight,blockWidth))
     for i in range(Nr):
         for j in range(Nc):
@@ -65,12 +66,12 @@ def blockHankel(Hleft,Hbot=None,blockHeight=1):
     
     blockWidth = Hleft.shape[1]
     if Hbot is None:
-        Nr = len(Hleft) / blockHeight
+        Nr = int( len(Hleft) / blockHeight )
         Nc = Nr
     else:
         blockHeight = len(Hbot)
-        Nr = len(Hleft) / blockHeight
-        Nc = Hbot.shape[1] / blockWidth
+        Nr = int( len(Hleft) / blockHeight )
+        Nc = int( Hbot.shape[1] / blockWidth )
         
     LeftBlock = np.zeros((Nr,blockHeight,blockWidth))
     
@@ -280,18 +281,17 @@ def N4SID(u,y,NumRows,NumCols,NSig,require_stable=False):
         K = la.lstsq(GamData.T,GamYData.T)[0].T
     else:
 
-        Kvar = cvx.Variable(NSig+NumOutputs,NSig+NumInputs*NumRows)
+        Kvar = cvx.Variable( shape = (NSig+NumOutputs, NSig+NumInputs*NumRows) )
 
         Avar = Kvar[:NSig,:NSig]
 
-        Pvar = cvx.Semidef(NSig)
+        Pvar = cvx.Variable( shape=(NSig, NSig), PSD=True ) #cvx.Semidef(NSig)
 
-        LyapCheck = cvx.vstack(cvx.hstack(Pvar,Avar),
-                               cvx.hstack(Avar.T,np.eye(NSig)))
+        LyapCheck = cvx.vstack( [ cvx.hstack( [ Pvar,Avar ] ), cvx.hstack( [ Avar.T,np.eye(NSig) ] ) ] )
 
         Constraints = [LyapCheck>>0,Pvar << np.eye(NSig)]
 
-        diffVar = GamYData - Kvar*GamData
+        diffVar = GamYData - Kvar @ GamData
         objFun = cvx.norm(diffVar,'fro')
         Objective = cvx.Minimize(objFun)
 
